@@ -1,0 +1,11 @@
+numpy
+opencv-python
+torch
+torchvision
+pillow
+matplotlib
+scikit-learn
+pandas
+yolov8
+ffmpeg-python
+tqdm
