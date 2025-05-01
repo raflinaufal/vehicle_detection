@@ -5,6 +5,7 @@ import logging
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import cv2
+import numpy as np
 from src.utils.video_processing import read_video, display_video_with_ui, display_video_with_opencv
 from src.utils.yolo_inference import run_yolo_inference
 from src.tracking.tracker import VehicleTracker
@@ -60,11 +61,50 @@ def process_frame(frame, vehicle_tracker, speed_estimator, vehicle_counter):
         center_y = int((bbox[1] + bbox[3]) / 2)
         speed = speed_estimator.estimate_speed(vehicle_id, (center_x, center_y))
         color = DETECTION_COLORS.get(vehicle_type, (255, 255, 255))
-        cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
-        label = f"{vehicle_id}:{vehicle_type} {int(speed)}km/h"
-        text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-        cv2.rectangle(frame, (bbox[0], bbox[1] - text_size[1] - 10), (bbox[0] + text_size[0], bbox[1]), color, -1)
-        cv2.putText(frame, label, (bbox[0], bbox[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        
+        # Draw bounding box with more contrast
+        cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+        
+        # Enhanced text with shadow for better visibility
+        label = f"{vehicle_id}:{vehicle_type}"
+        speed_text = f"{int(speed)}km/h"
+        
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        thickness = 1
+        
+        # Calculate position for label
+        text_y = bbox[1] - 7
+        if text_y < 15:
+            text_y = bbox[1] + 15
+            
+        # Text with outline technique for ID and type
+        # First draw black outline for contrast
+        for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+            cv2.putText(frame, label, 
+                      (bbox[0]+dx, text_y+dy), 
+                      font, font_scale, (0,0,0), thickness+1)
+        
+        # Then draw text in color
+        cv2.putText(frame, label, 
+                   (bbox[0], text_y), 
+                   font, font_scale, color, thickness+1)
+        
+        # Same technique for speed
+        speed_size = cv2.getTextSize(speed_text, font, font_scale, thickness)[0]
+        speed_x = bbox[2] - speed_size[0] - 2
+        
+        # Draw speed with black outline
+        for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+            cv2.putText(frame, speed_text, 
+                      (speed_x+dx, text_y+dy), 
+                      font, font_scale, (0,0,0), thickness+1)
+        
+        # Then draw speed text in color
+        cv2.putText(frame, speed_text, 
+                   (speed_x, text_y), 
+                   font, font_scale, color, thickness+1)
+        
         # Update counter: crossing line
         vehicle_counter.update_counts(vehicle_id, center_y, vehicle_type)
 
@@ -72,32 +112,91 @@ def process_frame(frame, vehicle_tracker, speed_estimator, vehicle_counter):
     enter_count = counts['total']['enter']
     leave_count = counts['total']['leave']
 
-    # --- Display counts ---
+    # Display counts with high contrast text
+    # Left side: Leaving counts
     x_left = 10
-    y_top = 30
-    cv2.putText(frame, "Count of Vehicles Leaving", (x_left, y_top), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-    cv2.putText(frame, f"Total Count: {leave_count}", (x_left, y_top + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-    y_offset = y_top + 60
+    y_top = 25
+    
+    # Use text with outlines for better visibility
+    # Vehicles Leaving title
+    title_text = "Vehicles Leaving"
+    # Draw outline (black shadow)
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        cv2.putText(frame, title_text, 
+                  (x_left+dx, y_top+dy), 
+                  font, 0.7, (0,0,0), 2)
+    # Draw text
+    cv2.putText(frame, title_text, 
+               (x_left, y_top), 
+               font, 0.7, COUNT_TEXT_COLOR, 2)
+    
+    # Total count
+    total_text = f"Total: {leave_count}"
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        cv2.putText(frame, total_text, 
+                  (x_left+dx, y_top+25+dy), 
+                  font, 0.7, (0,0,0), 2)
+    cv2.putText(frame, total_text, 
+               (x_left, y_top+25), 
+               font, 0.7, COUNT_TEXT_COLOR, 2)
+    
+    # Individual type counts
+    y_offset = y_top + 50
     for vehicle_type, count in counts['by_type'].items():
         if count['leave'] > 0:
-            cv2.putText(frame, f"{vehicle_type}:{count['leave']}", (x_left, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-            y_offset += 30
-
-    # Top-right: Entering
-    enter_title = "Count of Vehicles Entering"
-    total_enter_text = f"Total Count: {enter_count}"
-    (title_w, _), _ = cv2.getTextSize(enter_title, cv2.FONT_HERSHEY_SIMPLEX, 1, 3)
-    (total_w, _), _ = cv2.getTextSize(total_enter_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 3)
-    x_right = frame_width - title_w - 10
-    cv2.putText(frame, enter_title, (x_right, y_top), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-    cv2.putText(frame, total_enter_text, (frame_width - total_w - 10, y_top + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-    y_offset = y_top + 60
+            type_text = f"{vehicle_type}: {count['leave']}"
+            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+                cv2.putText(frame, type_text, 
+                          (x_left+dx, y_offset+dy), 
+                          font, 0.7, (0,0,0), 2)
+            cv2.putText(frame, type_text, 
+                       (x_left, y_offset), 
+                       font, 0.7, COUNT_TEXT_COLOR, 2)
+            y_offset += 25
+    
+    # Right side: Entering counts
+    enter_title = "Vehicles Entering"
+    title_size = cv2.getTextSize(enter_title, font, 0.7, 2)[0]
+    x_right = frame_width - title_size[0] - 10
+    
+    # Title with outline
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        cv2.putText(frame, enter_title, 
+                  (x_right+dx, y_top+dy), 
+                  font, 0.7, (0,0,0), 2)
+    cv2.putText(frame, enter_title, 
+               (x_right, y_top), 
+               font, 0.7, COUNT_TEXT_COLOR, 2)
+    
+    # Total count
+    total_enter_text = f"Total: {enter_count}"
+    total_size = cv2.getTextSize(total_enter_text, font, 0.7, 2)[0]
+    x_total = frame_width - total_size[0] - 10
+    
+    for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+        cv2.putText(frame, total_enter_text, 
+                  (x_total+dx, y_top+25+dy), 
+                  font, 0.7, (0,0,0), 2)
+    cv2.putText(frame, total_enter_text, 
+               (x_total, y_top+25), 
+               font, 0.7, COUNT_TEXT_COLOR, 2)
+    
+    # Individual type counts
+    y_offset = y_top + 50
     for vehicle_type, count in counts['by_type'].items():
         if count['enter'] > 0:
-            pertype_text = f"{vehicle_type}:{count['enter']}"
-            (w, _), _ = cv2.getTextSize(pertype_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 3)
-            cv2.putText(frame, pertype_text, (frame_width - w - 10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 1, COUNT_TEXT_COLOR, 3)
-            y_offset += 30
+            vehicle_text = f"{vehicle_type}: {count['enter']}"
+            text_size = cv2.getTextSize(vehicle_text, font, 0.7, 2)[0]
+            text_x = frame_width - text_size[0] - 10
+            
+            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1)]:
+                cv2.putText(frame, vehicle_text, 
+                          (text_x+dx, y_offset+dy), 
+                          font, 0.7, (0,0,0), 2)
+            cv2.putText(frame, vehicle_text, 
+                       (text_x, y_offset), 
+                       font, 0.7, COUNT_TEXT_COLOR, 2)
+            y_offset += 25
 
     return frame
 
