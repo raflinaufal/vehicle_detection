@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import logging
+from src.config.settings import DRONE_ALTITUDE
 
 class SpeedEstimator:
     def __init__(self, fps, real_world_distance_per_pixel):
@@ -13,14 +14,18 @@ class SpeedEstimator:
         self.current_time = time.time()
         self.history_length = 5  # Track positions over multiple frames for smoother speed calculation
         self.speed_smoothing_factor = 0.7  # Higher value = more smoothing (0-1)
+        
+        # Remove maximum speed limits
+        # self.max_speed_limits = { ... }  # This is no longer needed
     
-    def estimate_speed(self, vehicle_id, current_position):
+    def estimate_speed(self, vehicle_id, current_position, vehicle_type='car'):
         """
         Estimate the speed of a vehicle based on its movement between frames.
         
         Args:
             vehicle_id: Unique identifier for the vehicle
             current_position: Current position (x, y) of the vehicle center
+            vehicle_type: Type of the vehicle ('motorcycle', 'car', 'truck')
             
         Returns:
             Estimated speed in km/h
@@ -71,6 +76,7 @@ class SpeedEstimator:
         
         # Convert to real-world distance (in meters)
         distance = pixel_distance * self.real_world_distance_per_pixel
+        logging.debug(f"Vehicle {vehicle_id}: Pixel distance = {pixel_distance}, Real-world distance = {distance} meters")
         
         # Calculate speed (distance / time)
         # For frame-based: speed = distance * (self.fps / frames_elapsed) * 3.6
@@ -82,6 +88,8 @@ class SpeedEstimator:
             # Use real-time calculation
             speed = distance / time_elapsed * 3.6  # Convert to km/h
         
+        logging.debug(f"Vehicle {vehicle_id}: Calculated speed = {speed} km/h")
+
         # Apply low-pass filter for smoother speed estimates
         if self.speed_history[vehicle_id] > 0:
             smoothed_speed = (self.speed_smoothing_factor * self.speed_history[vehicle_id] + 
@@ -93,10 +101,11 @@ class SpeedEstimator:
         self.previous_positions[vehicle_id] = (center_x, center_y)
         self.last_update_time[vehicle_id] = self.current_time
         
-        # Apply some constraints to avoid unrealistic values
-        if smoothed_speed > 120:  # Cap maximum speed
-            smoothed_speed = 120
-        
+        # Remove maximum speed limit application
+        # max_speed = self.max_speed_limits.get(vehicle_type, 100)
+        # if smoothed_speed > max_speed:
+        #     smoothed_speed = max_speed
+
         # Update speed history
         self.speed_history[vehicle_id] = max(0, smoothed_speed)
         
@@ -107,3 +116,32 @@ class SpeedEstimator:
         self.position_history.clear()
         self.speed_history.clear()
         self.last_update_time.clear()
+
+    @staticmethod
+    def calculate_real_world_distance_per_pixel(frame_width, frame_height, fov_horizontal, fov_vertical):
+        """
+        Calculate the real-world distance per pixel based on drone altitude and camera FOV.
+        
+        Args:
+            frame_width: Width of the video frame in pixels.
+            frame_height: Height of the video frame in pixels.
+            fov_horizontal: Horizontal field of view of the camera (in degrees).
+            fov_vertical: Vertical field of view of the camera (in degrees).
+        
+        Returns:
+            Real-world distance per pixel (in meters).
+        """
+        # Convert FOV from degrees to radians
+        fov_horizontal_rad = np.radians(fov_horizontal)
+        fov_vertical_rad = np.radians(fov_vertical)
+
+        # Calculate the width and height of the ground area captured by the camera
+        ground_width = 2 * DRONE_ALTITUDE * np.tan(fov_horizontal_rad / 2)
+        ground_height = 2 * DRONE_ALTITUDE * np.tan(fov_vertical_rad / 2)
+
+        # Calculate real-world distance per pixel
+        distance_per_pixel_width = ground_width / frame_width
+        distance_per_pixel_height = ground_height / frame_height
+
+        # Use the average of width and height for simplicity
+        return (distance_per_pixel_width + distance_per_pixel_height) / 2

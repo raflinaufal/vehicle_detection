@@ -1,0 +1,25 @@
+# Ignore input and output video data
+data/input_videos/
+data/output_results/
+
+
+# Ignore model files (optional, if models are large and can be downloaded)
+models/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+env/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# OS-specific files
+.DS_Store
+Thumbs.db

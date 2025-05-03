@@ -18,7 +18,7 @@ except ImportError:
         print("Please manually install the required package by running: pip install ultralytics")
         sys.exit(1)
 
-from src.config.settings import MODEL_PATH, VEHICLE_CLASSES, DETECT_ONLY_CLASSES, TRACKING_CONFIDENCE_THRESHOLD
+from src.config.settings import MODEL_PATH, DETECT_ONLY_CLASSES, TRACKING_CONFIDENCE_THRESHOLD
 
 import cv2
 
@@ -51,34 +51,21 @@ def process_detections(detections):
     Returns:
         List of formatted detection dictionaries
     """
-    # Define the classes we're interested in from settings
-    target_classes = DETECT_ONLY_CLASSES if DETECT_ONLY_CLASSES else list(VEHICLE_CLASSES.keys())
+    target_classes = DETECT_ONLY_CLASSES
     confidence_threshold = TRACKING_CONFIDENCE_THRESHOLD
     
     processed_results = []
     
     try:
         for det in detections:
-            boxes = det.boxes
-            
-            # Apply Non-Maximum Suppression with higher threshold to avoid missing detections
-            # This is handled automatically by YOLOv8, but we can control the processing
+            boxes = det.boxes  # YOLOv8 automatically applies NMS
             
             for box in boxes:
-                # Get box coordinates in (top, left, bottom, right) format
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
-                
-                # Get confidence
                 confidence = box.conf[0].item()
-                
-                # Get class ID
                 class_id = int(box.cls[0].item())
                 
-                # Special case for motorcycle detection - use lower threshold
-                motorcycle_threshold = confidence_threshold * 0.8 if class_id == 3 else confidence_threshold
-                
-                # Only include vehicles we're interested in
-                if class_id in target_classes and confidence >= motorcycle_threshold:
+                if (not target_classes or class_id in target_classes) and confidence >= confidence_threshold:
                     processed_results.append({
                         'bbox': (int(x1), int(y1), int(x2), int(y2)),
                         'confidence': float(confidence),

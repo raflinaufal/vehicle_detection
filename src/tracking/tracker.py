@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-from src.config.settings import VEHICLE_CLASSES, DETECT_ONLY_CLASSES, TRACKING_CONFIDENCE_THRESHOLD
+from src.config.settings import DETECT_ONLY_CLASSES, TRACKING_CONFIDENCE_THRESHOLD
 from src.utils.yolo_inference import process_detections
 
 def iou(boxA, boxB):
@@ -64,7 +64,7 @@ class VehicleTracker:
             if idx not in assigned:
                 updated_tracks[self.next_id] = {
                     'bbox': det['bbox'],
-                    'class_id': det['class_id'],
+                    'class_id': det['class_id'],  # Class ID is still included for general use
                     'lost': 0,
                     'last_frame': self.frame_count
                 }

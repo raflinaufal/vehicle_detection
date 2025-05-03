@@ -15,6 +15,18 @@ def read_video(video_path):
     return video_capture
 
 def write_video(output_path, frame_width, frame_height, fps):
+    """
+    Create a video writer object to save processed frames to a video file.
+    
+    Args:
+        output_path: Path to save the output video.
+        frame_width: Width of the video frames.
+        frame_height: Height of the video frames.
+        fps: Frames per second of the output video.
+    
+    Returns:
+        cv2.VideoWriter object.
+    """
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
     return out
